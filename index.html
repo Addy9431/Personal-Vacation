@@ -1219,6 +1219,56 @@ body.edit-mode [contenteditable]:focus {
 
 
 .tm-hidden { display: none !important; }
+
+/* Past Trips tab */
+.pt-empty {
+  font-size: 13px; color: var(--muted); font-style: italic;
+  text-align: center; padding: 2rem 1rem;
+}
+.pt-notice {
+  font-size: 11px; color: var(--muted); line-height: 1.55;
+  background: rgba(196,149,42,.06); border: 1px solid rgba(196,149,42,.2);
+  border-radius: 8px; padding: .6rem .85rem; margin-bottom: 1rem;
+}
+.pt-card {
+  background: var(--warm-white); border: 1px solid var(--border);
+  border-radius: 10px; padding: .85rem 1rem; margin-bottom: .75rem;
+  box-shadow: var(--shadow); transition: box-shadow .15s;
+}
+.pt-card:hover { box-shadow: var(--shadow-lg); }
+.pt-card-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem; font-weight: 500; color: var(--ink); margin-bottom: 2px;
+}
+.pt-card-meta {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  color: var(--muted); margin-bottom: .5rem;
+}
+.pt-card-dests {
+  font-size: 11.5px; color: var(--muted); margin-bottom: .75rem;
+  line-height: 1.5;
+}
+.pt-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.pt-btn {
+  padding: 5px 13px; border-radius: 6px; font-size: 11.5px;
+  font-weight: 500; cursor: pointer; border: 1px solid;
+  font-family: 'DM Sans', sans-serif; transition: all .15s;
+}
+.pt-btn-restore {
+  color: var(--mediterranean); border-color: rgba(42,107,138,.35);
+  background: transparent;
+}
+.pt-btn-restore:hover { background: rgba(42,107,138,.07); }
+.pt-btn-download {
+  color: var(--sage); border-color: rgba(90,122,90,.35);
+  background: transparent;
+}
+.pt-btn-download:hover { background: rgba(90,122,90,.07); }
+.pt-btn-delete {
+  color: rgba(196,90,42,.5); border-color: rgba(196,90,42,.2);
+  background: transparent; margin-left: auto;
+}
+.pt-btn-delete:hover { color: var(--terracotta); border-color: var(--terracotta); background: rgba(196,90,42,.06); }
 </style>
 </head>
 <body>
@@ -1234,6 +1284,7 @@ body.edit-mode [contenteditable]:focus {
       <button class="tm-tab active" onclick="switchTMTab('settings',this)">Trip Settings</button>
       <button class="tm-tab" onclick="switchTMTab('destinations',this)">Destinations</button>
       <button class="tm-tab" onclick="switchTMTab('days',this)">Day Cards</button>
+      <button class="tm-tab" onclick="switchTMTab('pasttrips',this)">Past Trips</button>
     </div>
     <div class="tm-body">
 
@@ -1275,10 +1326,10 @@ body.edit-mode [contenteditable]:focus {
         </div>
         <div class="tm-field" style="margin-top:1.25rem">
           <div class="tm-label" style="color:var(--terracotta)">Danger zone</div>
-          <button class="tm-apply-btn" style="background:rgba(196,90,42,.85);margin-top:.25rem" onclick="resetToBlankTrip()">
+          <button class="tm-apply-btn" style="background:rgba(196,90,42,.85);margin-top:.25rem" onclick="startNewTrip()">
             Start fresh — clear all content
           </button>
-          <p style="font-size:11px;color:var(--muted);margin-top:.4rem">Removes all day cards, port cards, and financials. Trip settings are kept. Use ↓ Save Copy first if you want to keep this trip.</p>
+          <p style="font-size:11px;color:var(--muted);margin-top:.4rem">Archives this trip to Past Trips, then wipes everything for a fresh start.</p>
         </div>
       </div>
 
@@ -1308,6 +1359,11 @@ body.edit-mode [contenteditable]:focus {
               <input type="date" class="tm-input" id="tmNewEnd">
             </div>
           </div>
+          <div class="tm-field" style="margin:0 0 .5rem">
+            <div class="tm-label">Color</div>
+            <div class="tm-color-swatches" id="tmNewSwatches"></div>
+            <input type="hidden" id="tmNewColor" value="#c4952a">
+          </div>
           <button class="tm-save-dest" onclick="addDestination()">Add to trip</button>
         </div>
       </div>
@@ -1316,6 +1372,14 @@ body.edit-mode [contenteditable]:focus {
       <div class="tm-tab-panel" id="tm-days">
         <p style="font-size:12px;color:var(--muted);margin-bottom:.85rem">Remove day cards you don't need, or add blank ones to any destination.</p>
         <div id="tmDaysList"></div>
+      </div>
+
+      <!-- PAST TRIPS TAB -->
+      <div class="tm-tab-panel" id="tm-pasttrips">
+        <div class="pt-notice">
+          💾 Past trips are saved in this browser only. Use <strong>Download</strong> on any past trip for a permanent backup file you can open anywhere.
+        </div>
+        <div id="ptList"></div>
       </div>
 
     </div>
@@ -3053,12 +3117,13 @@ function openTripManager() {
   renderDestList();
   renderDaysList();
   switchTMTab('settings', document.querySelector('.tm-tab'));
+  renderSwatches('tmNewSwatches', 'tmNewColor', '#c4952a');
 }
 
 function showAddDestForm() {
   const form = document.getElementById('tmAddForm');
   if (form) form.classList.add('visible');
-  renderSwatches('tmNewSwatches', 'tm-new-color', document.getElementById('tm-new-color')?.value || '#c4952a');
+  renderSwatches('tmNewSwatches', 'tmNewColor', document.getElementById('tmNewColor')?.value || '#c4952a');
 }
 
 function hideAddDestForm() {
@@ -3332,7 +3397,7 @@ function addDestination() {
   const name  = document.getElementById('tmNewName')?.value?.trim();
   const start = document.getElementById('tmNewStart')?.value || '';
   const end   = document.getElementById('tmNewEnd')?.value   || '';
-  const color = document.getElementById('tm-new-color')?.value || '#c4952a';
+  const color = document.getElementById('tmNewColor')?.value || '#c4952a';
   if (!name) { document.getElementById('tmNewName').focus(); return; }
 
   const id = 'dest-' + name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g,'-');
@@ -3412,8 +3477,8 @@ function addDestination() {
   document.getElementById('tmNewIcon').value = '📍';
   document.getElementById('tmNewStart').value = '';
   document.getElementById('tmNewEnd').value = '';
-  document.getElementById('tm-new-color').value = '#c4952a';
-  renderSwatches('tmNewSwatches', 'tm-new-color', '#c4952a');
+  document.getElementById('tmNewColor').value = '#c4952a';
+  renderSwatches('tmNewSwatches', 'tmNewColor', '#c4952a');
 
   renderDestList();
   renderDaysList();
@@ -3581,7 +3646,10 @@ function addDayCard(dest) {
 
 // ── NEW TRIP / FULL RESET ──
 function startNewTrip() {
-  if (!confirm('Start a new trip?\n\nThis will clear ALL destinations, day cards, itinerary content, financials, and activities. The tool itself stays — you\'ll get a blank slate.\n\nSave a copy first if you want to keep this trip!\n\nContinue?')) return;
+  if (!confirm('Start a new trip?\n\nYour current trip will be automatically saved to Past Trips before wiping — you can restore it anytime.\n\nContinue?')) return;
+
+  // Archive current trip to localStorage first
+  archiveCurrentTrip();
 
   document.querySelectorAll('.day-card, .port-card').forEach(c => c.remove());
 
@@ -3635,103 +3703,123 @@ function startNewTrip() {
   closeTripManager();
 }
 
+// ══════════════════════════════════════════
+// PAST TRIPS — localStorage archive
+// ══════════════════════════════════════════
+
+const PT_KEY = 'travelPacketPastTrips';
+
+function ptLoad() {
+  try { return JSON.parse(localStorage.getItem(PT_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function ptSave(trips) {
+  try { localStorage.setItem(PT_KEY, JSON.stringify(trips)); }
+  catch(e) { alert('Could not save to browser storage — you may be in private browsing mode. Use Download instead.'); }
+}
+
+// Snapshot the current trip into localStorage
+function archiveCurrentTrip(name) {
+  const trips = ptLoad();
+  const snapshot = {
+    id: Date.now(),
+    name: name || document.getElementById('tmTripName')?.value || 'Untitled Trip',
+    sub: document.getElementById('tmTripSub')?.value || '',
+    archivedAt: new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }),
+    destinations: DESTINATIONS
+      .filter(d => {
+        const sec = document.getElementById('sec-' + d.id);
+        return sec && !sec.classList.contains('tm-hidden');
+      })
+      .map(d => d.icon + ' ' + d.name)
+      .join(', '),
+    html: '<!DOCTYPE html>\n' + document.documentElement.outerHTML,
+  };
+  trips.unshift(snapshot); // newest first
+  ptSave(trips);
+  renderPastTrips();
+}
+
+// Render the Past Trips tab
+function renderPastTrips() {
+  const list = document.getElementById('ptList');
+  if (!list) return;
+  const trips = ptLoad();
+
+  if (!trips.length) {
+    list.innerHTML = '<div class="pt-empty">No past trips yet.<br>When you start a new trip, this one gets archived here automatically.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  trips.forEach(trip => {
+    const card = document.createElement('div');
+    card.className = 'pt-card';
+    card.innerHTML = `
+      <div class="pt-card-name">${trip.name}</div>
+      <div class="pt-card-meta">Archived ${trip.archivedAt}</div>
+      ${trip.destinations ? `<div class="pt-card-dests">${trip.destinations}</div>` : ''}
+      ${trip.sub ? `<div class="pt-card-meta" style="font-style:italic;margin-bottom:.5rem">${trip.sub}</div>` : ''}
+      <div class="pt-card-actions">
+        <button class="pt-btn pt-btn-restore" onclick="ptRestore(${trip.id})">↩ Restore</button>
+        <button class="pt-btn pt-btn-download" onclick="ptDownload(${trip.id})">↓ Download</button>
+        <button class="pt-btn pt-btn-delete" onclick="ptDelete(${trip.id})">✕ Remove</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+// Restore a past trip — loads its full HTML back into the page
+function ptRestore(id) {
+  if (!confirm('Restore this trip? Your current trip will be archived first so you won\'t lose it.\n\nContinue?')) return;
+  const trips = ptLoad();
+  const trip = trips.find(t => t.id === id);
+  if (!trip || !trip.html) { alert('Could not find that trip\'s data.'); return; }
+  // Archive current first
+  archiveCurrentTrip();
+  // Then load the restored trip's HTML
+  document.open();
+  document.write(trip.html);
+  document.close();
+}
+
+// Download a past trip as a standalone HTML file
+function ptDownload(id) {
+  const trips = ptLoad();
+  const trip = trips.find(t => t.id === id);
+  if (!trip || !trip.html) { alert('Could not find that trip\'s data.'); return; }
+  const safeName = (trip.name || 'trip').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const blob = new Blob([trip.html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = safeName + '.html';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Delete a past trip
+function ptDelete(id) {
+  if (!confirm('Permanently remove this past trip? This cannot be undone.')) return;
+  const trips = ptLoad().filter(t => t.id !== id);
+  ptSave(trips);
+  renderPastTrips();
+}
+
+// Render past trips when that tab is opened
+const _origSwitchTMTab = switchTMTab;
+function switchTMTab(tabId, btn) {
+  document.querySelectorAll('.tm-tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tm-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tm-' + tabId).classList.add('active');
+  btn.classList.add('active');
+  if (tabId === 'pasttrips') renderPastTrips();
+}
+
 
 </script>
-
-<!-- ── TRIP MANAGER DRAWER ── -->
-<div class="tm-backdrop" id="tmBackdrop" onclick="closeTripManager()">
-  <div class="tm-drawer" onclick="event.stopPropagation()">
-    <div class="tm-drawer-header">
-      <span class="tm-drawer-title">⚙ Manage Trip</span>
-      <button class="tm-close" onclick="closeTripManager()">×</button>
-    </div>
-    <div class="tm-drawer-body">
-
-      <!-- Trip settings -->
-      <div class="tm-section-label">Trip name</div>
-      <input class="tm-input" id="tm-trip-name" placeholder="e.g. Europe Summer 2026">
-
-      <div class="tm-row">
-        <div>
-          <div class="tm-section-label">Start date</div>
-          <input type="date" class="tm-input" id="tm-start-date">
-        </div>
-        <div>
-          <div class="tm-section-label">End date</div>
-          <input type="date" class="tm-input" id="tm-end-date">
-        </div>
-      </div>
-
-      <div class="tm-row">
-        <div>
-          <div class="tm-section-label">Travelers</div>
-          <input type="number" class="tm-input" id="tm-travelers" min="1" max="20" placeholder="2">
-        </div>
-        <div>
-          <div class="tm-section-label">Home currency</div>
-          <select class="tm-input" id="tm-currency">
-            <option value="USD">USD — US Dollar</option>
-            <option value="EUR">EUR — Euro</option>
-            <option value="GBP">GBP — British Pound</option>
-            <option value="CAD">CAD — Canadian Dollar</option>
-            <option value="AUD">AUD — Australian Dollar</option>
-            <option value="JPY">JPY — Japanese Yen</option>
-          </select>
-        </div>
-      </div>
-      <button class="tm-btn-add" style="width:100%;margin-bottom:.25rem" onclick="saveTripSettings()">Save settings</button>
-
-      <!-- Destinations -->
-      <div class="tm-section-label" style="margin-top:1.5rem">Destinations</div>
-      <div class="tm-dest-list" id="tmDestList"></div>
-
-      <button class="btn-show-add-dest" onclick="showAddDestForm()">+ Add destination</button>
-
-      <!-- Add destination form (hidden by default) -->
-      <div class="tm-add-form" id="tmAddForm">
-        <div class="tm-section-label" style="margin-top:0">New destination</div>
-        <div class="tm-add-row">
-          <input class="tm-emoji-input" id="tm-new-emoji" value="📍" maxlength="2">
-          <input class="tm-input" id="tm-new-name" placeholder="City or place name" style="margin-bottom:0">
-        </div>
-        <div class="tm-row">
-          <div>
-            <div class="tm-section-label">From</div>
-            <input type="date" class="tm-input" id="tm-new-start">
-          </div>
-          <div>
-            <div class="tm-section-label">To</div>
-            <input type="date" class="tm-input" id="tm-new-end">
-          </div>
-        </div>
-        <div class="tm-section-label">Color</div>
-        <div class="tm-color-swatches" id="tmNewSwatches"></div>
-        <input type="hidden" id="tm-new-color" value="#c4952a">
-        <div class="tm-form-actions">
-          <button class="tm-btn-cancel" onclick="hideAddDestForm()">Cancel</button>
-          <button class="tm-btn-add" onclick="addDestination()">Add destination</button>
-        </div>
-      </div>
-
-      <!-- Archived destinations -->
-      <div id="tmArchivedDests" style="display:none">
-        <div class="tm-section-label" style="margin-top:1.5rem;color:var(--muted)">Removed destinations</div>
-        <div class="tm-dest-list" id="tmArchivedDestList"></div>
-      </div>
-
-      <!-- New Trip -->
-      <div style="margin-top:2.5rem;padding-top:1.25rem;border-top:1px solid var(--border)">
-        <div class="tm-section-label" style="color:var(--terracotta);letter-spacing:.08em">Danger Zone</div>
-        <p style="font-size:11.5px;color:var(--muted);margin-bottom:.75rem;line-height:1.5">Wipes all destinations, itinerary content, financials, and activities — giving you a completely blank travel packet. Save a copy first if you want to keep this trip.</p>
-        <button onclick="startNewTrip()" style="width:100%;padding:9px 14px;font-size:12.5px;font-weight:500;font-family:'DM Sans',sans-serif;border:1.5px solid rgba(196,90,42,.45);border-radius:8px;background:transparent;color:var(--terracotta);cursor:pointer;transition:all .15s;letter-spacing:.02em"
-          onmouseover="this.style.background='rgba(196,90,42,.07)'" onmouseout="this.style.background='transparent'">
-          🗂 Start a New Trip
-        </button>
-      </div>
-
-    </div>
-  </div>
-</div>
 
 </body>
 </html>
